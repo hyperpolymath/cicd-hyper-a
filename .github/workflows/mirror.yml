@@ -8,14 +8,24 @@ on:
 
 permissions: read-all
 
+concurrency:
+  group: mirror-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   mirror-gitlab:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     if: vars.GITLAB_MIRROR_ENABLED == 'true'
     steps:
       - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
         with:
           fetch-depth: 0
+      - name: Add GitLab SSH known hosts
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          ssh-keyscan -t ed25519,rsa gitlab.com >> ~/.ssh/known_hosts 2>/dev/null
+          chmod 600 ~/.ssh/known_hosts
       - uses: webfactory/ssh-agent@dc588b651fe13675774614f8e6a936a468676387 # v0.9.0
         with:
           ssh-private-key: ${{ secrets.GITLAB_SSH_KEY }}
@@ -26,12 +36,18 @@ jobs:
           git push gitlab --tags --force
 
   mirror-codeberg:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     if: vars.CODEBERG_MIRROR_ENABLED == 'true'
     steps:
       - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
         with:
           fetch-depth: 0
+      - name: Add Codeberg SSH known hosts
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          ssh-keyscan -t ed25519,rsa codeberg.org >> ~/.ssh/known_hosts 2>/dev/null
+          chmod 600 ~/.ssh/known_hosts
       - uses: webfactory/ssh-agent@dc588b651fe13675774614f8e6a936a468676387 # v0.9.0
         with:
           ssh-private-key: ${{ secrets.CODEBERG_SSH_KEY }}
@@ -42,12 +58,18 @@ jobs:
           git push codeberg --tags --force
 
   mirror-bitbucket:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     if: vars.BITBUCKET_MIRROR_ENABLED == 'true'
     steps:
       - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
         with:
           fetch-depth: 0
+      - name: Add Bitbucket SSH known hosts
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          ssh-keyscan -t ed25519,rsa bitbucket.org >> ~/.ssh/known_hosts 2>/dev/null
+          chmod 600 ~/.ssh/known_hosts
       - uses: webfactory/ssh-agent@dc588b651fe13675774614f8e6a936a468676387 # v0.9.0
         with:
           ssh-private-key: ${{ secrets.BITBUCKET_SSH_KEY }}
