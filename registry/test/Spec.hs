@@ -6,8 +6,12 @@ module Main where
 import Test.Hspec
 import qualified RulesetSpec
 import qualified VerifySpec
+import qualified LiquidSpec
+import qualified APISpec
 
 main :: IO ()
 main = hspec $ do
   describe "Ruleset" RulesetSpec.spec
   describe "Verify" VerifySpec.spec
+  describe "Liquid" LiquidSpec.spec
+  describe "API" APISpec.spec

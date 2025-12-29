@@ -1,0 +1,373 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://hyperpolymath.dev/schemas/cicd-hyper-a/ruleset",
+  "title": "cicd-hyper-a Ruleset Schema",
+  "description": "JSON Schema for validated CI/CD rulesets",
+  "type": "object",
+  "required": ["name", "version", "effect", "rules"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "minLength": 3,
+      "maxLength": 64,
+      "description": "Unique ruleset identifier (lowercase, hyphenated)"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version (major.minor.patch)"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 500,
+      "description": "Human-readable description of the ruleset"
+    },
+    "author": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "url": { "type": "string", "format": "uri" }
+      },
+      "required": ["name"]
+    },
+    "license": {
+      "type": "string",
+      "description": "SPDX license identifier",
+      "default": "AGPL-3.0-or-later"
+    },
+    "effect": {
+      "type": "string",
+      "enum": ["preventive", "curative", "diagnostic"],
+      "description": "Primary effect type of the ruleset"
+    },
+    "targets": {
+      "type": "object",
+      "description": "Target environments for this ruleset",
+      "properties": {
+        "forges": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["github", "gitlab", "bitbucket", "codeberg", "sourcehut", "gitea", "radicle"]
+          },
+          "default": ["github"]
+        },
+        "languages": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Target programming languages"
+        },
+        "frameworks": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Target frameworks/libraries"
+        }
+      }
+    },
+    "rules": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/rule" },
+      "description": "List of rules in this ruleset"
+    },
+    "verification": {
+      "type": "object",
+      "description": "Verification metadata",
+      "properties": {
+        "verified": {
+          "type": "boolean",
+          "description": "Has this ruleset passed formal verification?"
+        },
+        "verifiedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "verifier": {
+          "type": "string",
+          "description": "Verification tool used"
+        },
+        "proofHash": {
+          "type": "string",
+          "description": "Hash of the verification proof"
+        },
+        "properties": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/verifiedProperty" }
+        }
+      }
+    },
+    "signature": {
+      "type": "object",
+      "description": "Cryptographic signature",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["gpg", "ssh", "sigstore"],
+          "description": "Signature type"
+        },
+        "keyId": {
+          "type": "string",
+          "description": "Signing key identifier"
+        },
+        "signature": {
+          "type": "string",
+          "description": "Base64-encoded signature"
+        },
+        "signedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "description": "Usage and effectiveness metrics",
+      "properties": {
+        "downloads": { "type": "integer", "minimum": 0 },
+        "applications": { "type": "integer", "minimum": 0 },
+        "successRate": { "type": "number", "minimum": 0, "maximum": 1 },
+        "avgHealthImprovement": { "type": "number" }
+      }
+    }
+  },
+  "definitions": {
+    "rule": {
+      "type": "object",
+      "required": ["id", "effect"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "description": "Unique rule identifier within ruleset"
+        },
+        "name": {
+          "type": "string",
+          "description": "Human-readable rule name"
+        },
+        "description": {
+          "type": "string",
+          "description": "Detailed description of what this rule does"
+        },
+        "effect": {
+          "type": "string",
+          "enum": ["preventive", "curative", "diagnostic"]
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["critical", "high", "medium", "low", "info"],
+          "default": "medium"
+        },
+        "condition": {
+          "$ref": "#/definitions/condition",
+          "description": "When this rule applies"
+        },
+        "action": {
+          "$ref": "#/definitions/action",
+          "description": "What this rule does"
+        },
+        "autoFixable": {
+          "type": "boolean",
+          "default": false,
+          "description": "Can this rule be auto-applied without human review?"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Confidence level for auto-fix (0.0-1.0)"
+        },
+        "source": {
+          "type": "string",
+          "enum": ["learned", "manual", "imported"],
+          "description": "How this rule was created"
+        },
+        "learnedFrom": {
+          "type": "object",
+          "description": "If learned, source training data",
+          "properties": {
+            "repos": { "type": "integer" },
+            "occurrences": { "type": "integer" },
+            "pattern": { "type": "string" }
+          }
+        }
+      }
+    },
+    "condition": {
+      "oneOf": [
+        { "$ref": "#/definitions/fileCondition" },
+        { "$ref": "#/definitions/languageCondition" },
+        { "$ref": "#/definitions/workflowCondition" },
+        { "$ref": "#/definitions/compositeCondition" }
+      ]
+    },
+    "fileCondition": {
+      "type": "object",
+      "required": ["type", "path"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["file-exists", "file-contains", "file-extension"]
+        },
+        "path": { "type": "string" },
+        "pattern": { "type": "string" },
+        "extension": { "type": "string" }
+      }
+    },
+    "languageCondition": {
+      "type": "object",
+      "required": ["type", "language"],
+      "properties": {
+        "type": { "const": "language-used" },
+        "language": { "type": "string" }
+      }
+    },
+    "workflowCondition": {
+      "type": "object",
+      "required": ["type", "pattern"],
+      "properties": {
+        "type": { "const": "workflow-has" },
+        "pattern": { "type": "string" }
+      }
+    },
+    "compositeCondition": {
+      "type": "object",
+      "required": ["type", "conditions"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["and", "or", "not"]
+        },
+        "conditions": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/condition" }
+        }
+      }
+    },
+    "action": {
+      "oneOf": [
+        { "$ref": "#/definitions/injectAction" },
+        { "$ref": "#/definitions/rejectAction" },
+        { "$ref": "#/definitions/replaceAction" },
+        { "$ref": "#/definitions/alertAction" },
+        { "$ref": "#/definitions/prAction" }
+      ]
+    },
+    "injectAction": {
+      "type": "object",
+      "required": ["type", "path", "content"],
+      "properties": {
+        "type": { "const": "inject-file" },
+        "path": { "type": "string" },
+        "content": { "type": "string" },
+        "overwrite": { "type": "boolean", "default": false }
+      }
+    },
+    "rejectAction": {
+      "type": "object",
+      "required": ["type", "message"],
+      "properties": {
+        "type": { "const": "reject-commit" },
+        "message": { "type": "string" }
+      }
+    },
+    "replaceAction": {
+      "type": "object",
+      "required": ["type", "path", "pattern", "replacement"],
+      "properties": {
+        "type": { "const": "replace-in-file" },
+        "path": { "type": "string" },
+        "pattern": { "type": "string" },
+        "replacement": { "type": "string" },
+        "global": { "type": "boolean", "default": true }
+      }
+    },
+    "alertAction": {
+      "type": "object",
+      "required": ["type", "severity", "message"],
+      "properties": {
+        "type": { "const": "alert" },
+        "severity": {
+          "type": "string",
+          "enum": ["critical", "high", "medium", "low", "info"]
+        },
+        "message": { "type": "string" }
+      }
+    },
+    "prAction": {
+      "type": "object",
+      "required": ["type", "title", "body"],
+      "properties": {
+        "type": { "const": "create-pr" },
+        "title": { "type": "string" },
+        "body": { "type": "string" },
+        "branch": { "type": "string" },
+        "labels": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "verifiedProperty": {
+      "type": "object",
+      "required": ["name", "status"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Property name (e.g., 'idempotent', 'no-regression')"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["proven", "tested", "unverified"]
+        },
+        "proof": {
+          "type": "string",
+          "description": "Proof or test reference"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "name": "rsr-compliance",
+      "version": "1.0.0",
+      "description": "RSR language policy enforcement",
+      "author": { "name": "hyperpolymath" },
+      "license": "AGPL-3.0-or-later",
+      "effect": "preventive",
+      "targets": {
+        "forges": ["github", "gitlab", "bitbucket"],
+        "languages": ["rust", "rescript", "gleam", "haskell"]
+      },
+      "rules": [
+        {
+          "id": "block-typescript",
+          "name": "Block TypeScript",
+          "effect": "preventive",
+          "severity": "high",
+          "condition": {
+            "type": "or",
+            "conditions": [
+              { "type": "language-used", "language": "typescript" },
+              { "type": "file-extension", "path": "*", "extension": ".ts" }
+            ]
+          },
+          "action": {
+            "type": "reject-commit",
+            "message": "TypeScript not allowed per RSR policy. Use ReScript instead."
+          },
+          "autoFixable": false
+        }
+      ],
+      "verification": {
+        "verified": true,
+        "verifier": "liquid-haskell",
+        "properties": [
+          { "name": "idempotent", "status": "proven" },
+          { "name": "no-regression", "status": "proven" }
+        ]
+      }
+    }
+  ]
+}
