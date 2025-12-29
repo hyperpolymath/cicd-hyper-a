@@ -1,0 +1,110 @@
+#!/bin/bash
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# cicd-hyper-a Post-Receive Hook
+# Triggers curative actions after push
+
+set -e
+
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+echo -e "${YELLOW}cicd-hyper-a post-receive hook${NC}"
+
+# Configuration
+CICD_HYPER_A_API="${CICD_HYPER_A_API:-http://localhost:8080}"
+CICD_HYPER_A_TOKEN="${CICD_HYPER_A_TOKEN:-}"
+
+while read oldrev newrev refname; do
+    # Skip if branch was deleted
+    if [ "$newrev" = "0000000000000000000000000000000000000000" ]; then
+        continue
+    fi
+
+    # Extract branch name
+    branch=$(echo "$refname" | sed 's|refs/heads/||')
+
+    # Get repository info
+    repo_path=$(pwd)
+    repo_name=$(basename "$repo_path" .git)
+
+    echo "Processing push to $branch in $repo_name"
+
+    # Get list of changed files
+    if [ "$oldrev" = "0000000000000000000000000000000000000000" ]; then
+        # New branch - check all files
+        files=$(git ls-tree -r --name-only "$newrev")
+    else
+        files=$(git diff --name-only "$oldrev" "$newrev")
+    fi
+
+    # ============================================================
+    # TRIGGER CURATIVE RULES
+    # ============================================================
+
+    # Check for workflow changes
+    workflow_changed=false
+    if echo "$files" | grep -q '\.github/workflows/'; then
+        workflow_changed=true
+        echo "Workflow files changed - triggering workflow linter"
+    fi
+
+    # Check for dependency changes
+    deps_changed=false
+    if echo "$files" | grep -qE '(Cargo\.toml|Cargo\.lock|deno\.json|package\.json)'; then
+        deps_changed=true
+        echo "Dependencies changed - triggering dependency scan"
+    fi
+
+    # Check for security policy changes
+    security_changed=false
+    if echo "$files" | grep -qE '(SECURITY\.md|\.github/SECURITY\.md)'; then
+        security_changed=true
+        echo "Security policy changed"
+    fi
+
+    # ============================================================
+    # NOTIFY CICD-HYPER-A ENGINE
+    # ============================================================
+
+    if [ -n "$CICD_HYPER_A_TOKEN" ] && [ -n "$CICD_HYPER_A_API" ]; then
+        payload=$(cat <<EOF
+{
+    "event": "push",
+    "repository": "$repo_name",
+    "branch": "$branch",
+    "commit": "$newrev",
+    "workflow_changed": $workflow_changed,
+    "deps_changed": $deps_changed,
+    "security_changed": $security_changed,
+    "files": $(echo "$files" | jq -R . | jq -s .)
+}
+EOF
+)
+
+        curl -s -X POST "$CICD_HYPER_A_API/hooks/post-receive" \
+            -H "Authorization: Bearer $CICD_HYPER_A_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "$payload" || echo "Warning: Failed to notify cicd-hyper-a engine"
+    fi
+
+    # ============================================================
+    # AUTO-FIX TRIGGERED
+    # ============================================================
+
+    if [ "$workflow_changed" = true ]; then
+        # Check for unpinned actions and suggest fixes
+        for wf in $(echo "$files" | grep '\.github/workflows/'); do
+            if [ -f "$wf" ]; then
+                unpinned=$(git show "$newrev:$wf" | grep -E 'uses:\s+[^@]+@(v[0-9]+|main|master)\s*$' || true)
+                if [ -n "$unpinned" ]; then
+                    echo -e "${YELLOW}Note: Found unpinned actions in $wf${NC}"
+                    echo "Run 'cicd-hyper-a fix unpinned-actions' to auto-pin"
+                fi
+            fi
+        done
+    fi
+done
+
+echo -e "${GREEN}Post-receive processing complete${NC}"
+exit 0

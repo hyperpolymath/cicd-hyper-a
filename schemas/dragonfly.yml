@@ -1,0 +1,126 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# cicd-hyper-a Dragonfly Cache Strategy
+
+# Dragonfly is a Redis-compatible in-memory store optimized for:
+# - High throughput (25x faster than Redis)
+# - Multi-threaded architecture
+# - Efficient memory usage
+
+server:
+  bind: 127.0.0.1
+  port: 6379
+  maxmemory: 2gb
+  maxmemory-policy: allkeys-lru
+
+# Cache key namespaces
+namespaces:
+  # Alert cache - TTL 1 hour (alerts refresh frequently)
+  alerts:
+    prefix: "alert:"
+    ttl: 3600
+    structure: hash
+    fields:
+      - alertId
+      - repoKey
+      - severity
+      - category
+      - autoFixable
+
+  # Rule cache - TTL 24 hours (rules are stable)
+  rules:
+    prefix: "rule:"
+    ttl: 86400
+    structure: hash
+    fields:
+      - name
+      - effect
+      - version
+      - enabled
+      - triggerCount
+
+  # Repo metadata cache - TTL 6 hours
+  repos:
+    prefix: "repo:"
+    ttl: 21600
+    structure: hash
+    fields:
+      - name
+      - forge
+      - owner
+      - scorecardScore
+      - lastScanned
+
+  # Fix suggestions cache - TTL 12 hours
+  fixes:
+    prefix: "fix:"
+    ttl: 43200
+    structure: string
+
+  # Rate limiting - TTL 1 minute
+  ratelimit:
+    prefix: "rl:"
+    ttl: 60
+    structure: string
+
+  # Session/job queue - No TTL (managed manually)
+  jobs:
+    prefix: "job:"
+    ttl: 0
+    structure: list
+
+# Sorted sets for priority queues
+sorted_sets:
+  # Alert priority queue (score = severity weight)
+  alert_priority:
+    key: "queue:alerts"
+    scores:
+      critical: 100
+      high: 75
+      medium: 50
+      low: 25
+      info: 10
+
+  # Fix execution queue (score = timestamp)
+  fix_queue:
+    key: "queue:fixes"
+
+  # Repo scan queue (score = last_scanned timestamp)
+  scan_queue:
+    key: "queue:scans"
+
+# Pub/Sub channels
+channels:
+  # New alert detected
+  - name: alerts:new
+    description: Published when new alert found
+
+  # Alert fixed
+  - name: alerts:fixed
+    description: Published when alert auto-fixed
+
+  # Rule triggered
+  - name: rules:triggered
+    description: Published when rule fires
+
+  # Scan completed
+  - name: scans:complete
+    description: Published when repo scan finishes
+
+# Cluster configuration (for production)
+cluster:
+  enabled: false
+  nodes:
+    - host: dragonfly-1
+      port: 6379
+    - host: dragonfly-2
+      port: 6379
+    - host: dragonfly-3
+      port: 6379
+
+# Persistence (optional - primary data in ArangoDB)
+persistence:
+  enabled: false
+  # If enabled, use snapshots
+  snapshot:
+    interval: 3600
+    path: /var/lib/dragonfly/snapshots

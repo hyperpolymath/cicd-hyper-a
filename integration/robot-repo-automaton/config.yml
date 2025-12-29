@@ -1,0 +1,224 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# cicd-hyper-a Integration with robot-repo-automaton
+# Configuration for automated repository management
+
+integration:
+  name: cicd-hyper-a
+  version: 0.1.0
+  enabled: true
+
+# Connection to cicd-hyper-a engine
+engine:
+  # Logtalk rule engine
+  logtalk:
+    loader: engine/loader.lgt
+    rules:
+      - engine/rules/cicd_rules.lgt
+      - engine/rules/rule_distiller.lgt
+      - engine/rules/forge_adapters.lgt
+
+  # Haskell verification registry
+  registry:
+    cabal_file: registry/cicd-hyper-a.cabal
+    executable: registry
+    data_dir: registry/data
+
+# Data layer connections
+data:
+  # ArangoDB graph database
+  arangodb:
+    url: ${ARANGODB_URL:-http://localhost:8529}
+    database: cicd_hyper_a
+    username: ${ARANGODB_USER:-root}
+    password: ${ARANGODB_PASSWORD}
+    schema: schemas/arangodb-schema.json
+
+  # Dragonfly cache
+  dragonfly:
+    url: ${DRAGONFLY_URL:-redis://localhost:6379}
+    config: schemas/dragonfly.yml
+
+  # Radicle P2P (future)
+  radicle:
+    enabled: false
+    seed_nodes: []
+
+# Forge adapters
+forges:
+  github:
+    enabled: true
+    token: ${GITHUB_TOKEN}
+    org: hyperpolymath
+    api_version: "2022-11-28"
+
+  gitlab:
+    enabled: true
+    token: ${GITLAB_TOKEN}
+    org: hyperpolymath
+    api_url: https://gitlab.com/api/v4
+
+  bitbucket:
+    enabled: true
+    username: ${BITBUCKET_USER}
+    app_password: ${BITBUCKET_APP_PASSWORD}
+    workspace: hyperpolymath
+
+  codeberg:
+    enabled: false
+    token: ${CODEBERG_TOKEN}
+    org: hyperpolymath
+
+  sourcehut:
+    enabled: false
+    token: ${SOURCEHUT_TOKEN}
+    username: hyperpolymath
+
+# Rule execution
+rules:
+  # Preventive rules - run on pre-commit/pre-push
+  preventive:
+    enabled: true
+    hooks:
+      - pre-commit
+      - pre-push
+    actions:
+      - block-typescript
+      - block-golang
+      - require-spdx-header
+      - check-secrets
+
+  # Curative rules - run on schedule/webhook
+  curative:
+    enabled: true
+    schedule: "0 */6 * * *"  # Every 6 hours
+    actions:
+      - pin-github-actions
+      - add-workflow-permissions
+      - inject-security-md
+      - enable-branch-protection
+
+  # Diagnostic rules - run on demand
+  diagnostic:
+    enabled: true
+    report_to: console
+    checks:
+      - scorecard-scan
+      - codeql-analysis
+      - dependency-audit
+
+# Learning pipeline
+learning:
+  # Training data source
+  training_data:
+    path: training-data/
+    format: scm  # ERROR-CATALOG.scm format
+
+  # Distillation settings
+  distillation:
+    min_occurrences: 3
+    output_path: engine/rules/learned_rules.lgt
+
+  # Export formats
+  exports:
+    - format: logtalk
+      path: engine/rules/learned_rules.lgt
+    - format: haskell
+      path: registry/src/CicdHyperA/LearnedRules.hs
+
+# Webhook endpoints
+webhooks:
+  # Receive GitHub webhooks
+  github:
+    path: /webhooks/github
+    secret: ${GITHUB_WEBHOOK_SECRET}
+    events:
+      - push
+      - pull_request
+      - workflow_run
+      - code_scanning_alert
+      - security_advisory
+
+  # Receive GitLab webhooks
+  gitlab:
+    path: /webhooks/gitlab
+    secret: ${GITLAB_WEBHOOK_SECRET}
+    events:
+      - push
+      - merge_request
+      - pipeline
+
+# Alerts and notifications
+alerts:
+  # Slack notifications
+  slack:
+    enabled: false
+    webhook_url: ${SLACK_WEBHOOK_URL}
+    channel: "#security-alerts"
+
+  # Email notifications
+  email:
+    enabled: false
+    smtp_host: ${SMTP_HOST}
+    from: security@hyperpolymath.dev
+    to:
+      - security@hyperpolymath.dev
+
+  # Console output
+  console:
+    enabled: true
+    verbosity: info
+
+# RSR policy enforcement
+rsr_policy:
+  # Banned languages
+  banned_languages:
+    - typescript
+    - nodejs
+    - golang
+    - python  # Except SaltStack
+    - java
+    - kotlin
+    - swift
+
+  # Allowed languages
+  allowed_languages:
+    - rescript
+    - rust
+    - gleam
+    - julia
+    - logtalk
+    - haskell
+    - bash
+    - nickel
+    - guile
+    - ocaml
+    - ada
+
+  # Exceptions
+  exceptions:
+    - path: salt/**
+      allow: python
+    - path: legacy/**
+      allow: javascript
+
+# Metrics collection
+metrics:
+  enabled: true
+  endpoints:
+    prometheus: /metrics
+
+  # Track these metrics
+  collect:
+    - rules_triggered
+    - fixes_applied
+    - alerts_generated
+    - repos_scanned
+    - learning_examples
+
+# Health checks
+health:
+  endpoint: /health
+  checks:
+    - arangodb
+    - dragonfly
+    - github_api

@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+[package]
+name = "cicd-hyper-a-adapters"
+version = "0.1.0"
+edition = "2021"
+authors = ["hyperpolymath"]
+description = "Multi-forge adapters for cicd-hyper-a"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/hyperpolymath/cicd-hyper-a"
+
+[dependencies]
+tokio = { version = "1.35", features = ["full"] }
+reqwest = { version = "0.11", features = ["json"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+async-trait = "0.1"
+url = "2.5"
+base64 = "0.21"
+octocrab = "0.32"  # GitHub API
+tracing = "0.1"
+
+[dev-dependencies]
+tokio-test = "0.4"
+wiremock = "0.5"
+
+[[bin]]
+name = "forge-adapter"
+path = "src/main.rs"
