@@ -1,0 +1,54 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Dockerfile for cicd-hyper-a Logtalk Engine
+
+FROM swipl:stable AS base
+
+# Install Logtalk
+RUN apt-get update && apt-get install -y \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Download and install Logtalk
+ARG LOGTALK_VERSION=3.71.0
+RUN curl -sSL https://logtalk.org/files/logtalk-${LOGTALK_VERSION}.tar.bz2 | tar xj -C /opt \
+    && ln -s /opt/logtalk-${LOGTALK_VERSION} /opt/logtalk
+
+ENV LOGTALKHOME=/opt/logtalk
+ENV LOGTALKUSER=/app/logtalk
+ENV PATH="${LOGTALKHOME}/tools:${PATH}"
+
+WORKDIR /app
+
+# Copy engine files
+COPY engine /app/engine
+
+# Initialize Logtalk user directory
+RUN mkdir -p /app/logtalk && \
+    cp -r ${LOGTALKHOME}/loader-sample.lgt /app/logtalk/
+
+# Precompile rules
+RUN swipl -g "logtalk_load(engine/loader)" -t halt
+
+# Runtime
+FROM swipl:stable
+
+RUN apt-get update && apt-get install -y \
+    curl \
+    jq \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=base /opt/logtalk /opt/logtalk
+COPY --from=base /app /app
+
+ENV LOGTALKHOME=/opt/logtalk
+ENV LOGTALKUSER=/app/logtalk
+ENV PATH="${LOGTALKHOME}/tools:${PATH}"
+
+WORKDIR /app
+
+# Health check - verify rules load
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD swipl -g "logtalk_load(engine/loader), cicd_rules::is_auto_fixable('TokenPermissionsID')" -t halt || exit 1
+
+ENTRYPOINT ["swipl"]
+CMD ["-g", "logtalk_load(engine/loader)", "-t", "prolog"]

@@ -1,0 +1,42 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Dockerfile for cicd-hyper-a Rust Forge Adapters
+
+FROM rust:1.75-slim-bookworm AS builder
+
+WORKDIR /build
+
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy workspace files
+COPY Cargo.toml Cargo.lock* ./
+COPY adapters ./adapters
+COPY data ./data
+
+# Build release binary
+RUN cargo build --release --package cicd-hyper-a-adapters
+
+# Runtime image
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    libssl3 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY --from=builder /build/target/release/forge-adapter /usr/local/bin/forge-adapter
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8081/health || exit 1
+
+EXPOSE 8081
+
+ENTRYPOINT ["forge-adapter"]
+CMD ["serve"]

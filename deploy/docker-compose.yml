@@ -1,0 +1,167 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# cicd-hyper-a Docker Compose configuration
+# Local development and testing environment
+
+version: "3.8"
+
+services:
+  # ============================================================
+  # DATA LAYER
+  # ============================================================
+
+  arangodb:
+    image: arangodb:3.11
+    container_name: cicd-hyper-a-arangodb
+    environment:
+      ARANGO_ROOT_PASSWORD: ${ARANGO_ROOT_PASSWORD:-devpassword}
+      ARANGO_NO_AUTH: "0"
+    ports:
+      - "8529:8529"
+    volumes:
+      - arangodb_data:/var/lib/arangodb3
+      - arangodb_apps:/var/lib/arangodb3-apps
+      - ./init-arangodb.js:/docker-entrypoint-initdb.d/init.js:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8529/_api/version"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cicd-network
+
+  dragonfly:
+    image: docker.dragonflydb.io/dragonflydb/dragonfly:latest
+    container_name: cicd-hyper-a-dragonfly
+    command: >
+      --maxmemory=2gb
+      --proactor_threads=2
+      --cache_mode=true
+    ports:
+      - "6379:6379"
+    volumes:
+      - dragonfly_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cicd-network
+
+  # ============================================================
+  # REGISTRY SERVICE
+  # ============================================================
+
+  registry:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.registry
+    container_name: cicd-hyper-a-registry
+    environment:
+      ARANGODB_URL: http://arangodb:8529
+      ARANGODB_DATABASE: cicd_hyper_a
+      ARANGODB_USER: root
+      ARANGODB_PASSWORD: ${ARANGO_ROOT_PASSWORD:-devpassword}
+      DRAGONFLY_URL: redis://dragonfly:6379
+      PORT: 8080
+    ports:
+      - "8080:8080"
+    depends_on:
+      arangodb:
+        condition: service_healthy
+      dragonfly:
+        condition: service_healthy
+    networks:
+      - cicd-network
+
+  # ============================================================
+  # LOGTALK ENGINE
+  # ============================================================
+
+  engine:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.engine
+    container_name: cicd-hyper-a-engine
+    environment:
+      ARANGODB_URL: http://arangodb:8529
+      DRAGONFLY_URL: redis://dragonfly:6379
+    volumes:
+      - ../engine:/app/engine:ro
+      - ../training-data:/app/training-data:ro
+    depends_on:
+      arangodb:
+        condition: service_healthy
+      dragonfly:
+        condition: service_healthy
+    networks:
+      - cicd-network
+
+  # ============================================================
+  # FORGE ADAPTERS
+  # ============================================================
+
+  adapter:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.adapter
+    container_name: cicd-hyper-a-adapter
+    environment:
+      GITHUB_TOKEN: ${GITHUB_TOKEN}
+      GITLAB_TOKEN: ${GITLAB_TOKEN}
+      BITBUCKET_USER: ${BITBUCKET_USER}
+      BITBUCKET_APP_PASSWORD: ${BITBUCKET_APP_PASSWORD}
+      ARANGODB_URL: http://arangodb:8529
+      DRAGONFLY_URL: redis://dragonfly:6379
+    depends_on:
+      - registry
+      - engine
+    networks:
+      - cicd-network
+
+  # ============================================================
+  # MONITORING
+  # ============================================================
+
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: cicd-hyper-a-prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - cicd-network
+
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: cicd-hyper-a-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+    networks:
+      - cicd-network
+
+networks:
+  cicd-network:
+    driver: bridge
+
+volumes:
+  arangodb_data:
+  arangodb_apps:
+  dragonfly_data:
+  prometheus_data:
+  grafana_data:
