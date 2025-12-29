@@ -1,0 +1,52 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Prevention workflow - ensures branch protection is enabled
+# Run periodically to detect and alert on repos without protection
+name: Branch Protection Enforcer
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly on Sunday
+  workflow_dispatch:
+
+permissions: read-all
+
+jobs:
+  check-protection:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
+
+      - name: Check branch protection
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          REPO="${{ github.repository }}"
+          BRANCH="main"
+
+          # Try to get branch protection
+          if ! gh api "repos/$REPO/branches/$BRANCH/protection" 2>/dev/null; then
+            echo "::warning::Branch protection is NOT enabled on $BRANCH"
+
+            # Check for rulesets (newer API)
+            RULESETS=$(gh api "repos/$REPO/rulesets" --jq 'length' 2>/dev/null || echo "0")
+            if [ "$RULESETS" = "0" ]; then
+              echo "::error::No branch protection or rulesets configured!"
+              exit 1
+            else
+              echo "::notice::Using GitHub Rulesets instead of branch protection"
+            fi
+          else
+            echo "Branch protection is enabled"
+
+            # Check for required reviews
+            REVIEWS=$(gh api "repos/$REPO/branches/$BRANCH/protection" --jq '.required_pull_request_reviews.required_approving_review_count // 0')
+            if [ "$REVIEWS" -lt 1 ]; then
+              echo "::warning::Required reviews is $REVIEWS (recommended: at least 1)"
+            fi
+          fi
+
+      - name: Check CODEOWNERS
+        run: |
+          if [ ! -f ".github/CODEOWNERS" ] && [ ! -f "CODEOWNERS" ] && [ ! -f "docs/CODEOWNERS" ]; then
+            echo "::warning::No CODEOWNERS file found"
+          fi

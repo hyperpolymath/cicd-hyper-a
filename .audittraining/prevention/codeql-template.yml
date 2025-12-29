@@ -1,0 +1,61 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Template: CodeQL workflow with proper language detection
+# Copy to repos and adjust language matrix based on repo contents
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 6 * * 1'  # Weekly
+
+permissions: read-all
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # IMPORTANT: Only include languages actually in your repo
+        # Available: actions, c-cpp, csharp, go, java-kotlin, javascript-typescript, python, ruby, rust, swift
+        #
+        # DETECTION GUIDE:
+        # - Rust only: ['actions'] (CodeQL doesn't fully support Rust)
+        # - OCaml only: ['actions'] (CodeQL doesn't support OCaml)
+        # - JS/TS files in src/: ['actions', 'javascript-typescript']
+        # - Python files in src/: ['actions', 'python']
+        # - Go files: ['actions', 'go']
+        #
+        # 'actions' scans workflow files for security issues
+        language:
+          - actions
+          # Uncomment as needed:
+          # - javascript-typescript
+          # - python
+          # - go
+          # - java-kotlin
+          # - ruby
+
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@662472033e021d55d94146f66f6058822b0b39fd # v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-extended,security-and-quality
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@662472033e021d55d94146f66f6058822b0b39fd # v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@662472033e021d55d94146f66f6058822b0b39fd # v3
+        with:
+          category: "/language:${{ matrix.language }}"
