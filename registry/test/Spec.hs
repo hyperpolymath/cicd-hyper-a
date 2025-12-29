@@ -8,6 +8,7 @@ import qualified RulesetSpec
 import qualified VerifySpec
 import qualified LiquidSpec
 import qualified APISpec
+import qualified CLISpec
 
 main :: IO ()
 main = hspec $ do
@@ -15,3 +16,4 @@ main = hspec $ do
   describe "Verify" VerifySpec.spec
   describe "Liquid" LiquidSpec.spec
   describe "API" APISpec.spec
+  describe "CLI" CLISpec.spec

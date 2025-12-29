@@ -40,6 +40,9 @@ executable registry
     main-is:          Main.hs
     build-depends:    base ^>=4.17
                     , text ^>=2.0
+                    , time ^>=1.12
+                    , directory ^>=1.3
+                    , filepath ^>=1.4
                     , cicd-hyper-a
     hs-source-dirs:   src
     default-language: Haskell2010
@@ -52,7 +55,9 @@ test-suite cicd-hyper-a-test
                     , VerifySpec
                     , LiquidSpec
                     , APISpec
+                    , CLISpec
     build-depends:    base ^>=4.17
+                    , text ^>=2.0
                     , cicd-hyper-a
                     , hspec ^>=2.11
                     , QuickCheck ^>=2.14
