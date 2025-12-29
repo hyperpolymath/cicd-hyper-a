@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! GitLab forge adapter
 
+use crate::error::{AdapterError, Result};
+use crate::forge::{
+    Alert, AlertCategory, Forge, ForgeAdapter, Repository, Severity, Visibility, Workflow,
+    WorkflowState,
+};
 use async_trait::async_trait;
 use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
 use serde::Deserialize;
-use crate::error::{AdapterError, Result};
-use crate::forge::{
-    Alert, Forge, ForgeAdapter, Repository, Severity, Visibility, Workflow, WorkflowState,
-    AlertCategory,
-};
 
 /// GitLab adapter configuration
 pub struct GitLabAdapter {
@@ -91,12 +91,7 @@ impl ForgeAdapter for GitLabAdapter {
         let response: Vec<GitLabVulnerability> = match self.client.get(&url).send().await {
             Ok(resp) if resp.status().is_success() => resp.json().await?,
             Ok(resp) if resp.status().as_u16() == 404 => return Ok(vec![]),
-            Ok(resp) => {
-                return Err(AdapterError::ApiError(format!(
-                    "HTTP {}",
-                    resp.status()
-                )))
-            }
+            Ok(resp) => return Err(AdapterError::ApiError(format!("HTTP {}", resp.status()))),
             Err(e) => return Err(e.into()),
         };
 
@@ -185,12 +180,7 @@ impl ForgeAdapter for GitLabAdapter {
         Ok(())
     }
 
-    async fn enable_branch_protection(
-        &self,
-        owner: &str,
-        repo: &str,
-        branch: &str,
-    ) -> Result<()> {
+    async fn enable_branch_protection(&self, owner: &str, repo: &str, branch: &str) -> Result<()> {
         let project_path = format!("{}/{}", owner, repo);
         let url = format!(
             "{}/projects/{}/protected_branches",

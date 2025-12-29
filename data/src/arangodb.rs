@@ -7,7 +7,7 @@ use crate::ArangoConfig;
 use serde::{de::DeserializeOwned, Serialize};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{debug, error, info};
+use tracing::{debug, info};
 
 /// ArangoDB client with connection management
 pub struct ArangoClient {
@@ -49,7 +49,9 @@ impl ArangoClient {
         if *connected {
             Ok(())
         } else {
-            Err(DataError::ConnectionError("Not connected to ArangoDB".into()))
+            Err(DataError::ConnectionError(
+                "Not connected to ArangoDB".into(),
+            ))
         }
     }
 
@@ -118,12 +120,30 @@ impl ArangoClient {
         Ok(())
     }
 
+    /// Upsert a document (insert or update)
+    pub async fn upsert_document<T: Serialize>(&self, collection: &str, doc: &T) -> Result<String> {
+        let json = serde_json::to_string(doc)?;
+        debug!("Upserting into {}: {}", collection, json);
+        // In production: UPSERT AQL or merge-patch
+        Ok(format!("{}/upserted_key", collection))
+    }
+
+    /// Query documents with AQL and return typed results
+    pub async fn query_documents<T: DeserializeOwned>(&self, aql: &str) -> Result<Vec<T>> {
+        debug!("Query documents: {}", aql);
+        self.query(aql, serde_json::json!({})).await
+    }
+
     // ============================================================
     // QUERY OPERATIONS
     // ============================================================
 
     /// Execute AQL query
-    pub async fn query<T: DeserializeOwned>(&self, aql: &str, bind_vars: serde_json::Value) -> Result<Vec<T>> {
+    pub async fn query<T: DeserializeOwned>(
+        &self,
+        aql: &str,
+        bind_vars: serde_json::Value,
+    ) -> Result<Vec<T>> {
         debug!("Executing AQL: {} with vars: {}", aql, bind_vars);
         // In production: db.aql_query(aql).bind_vars(bind_vars).await
         Ok(vec![])
@@ -148,7 +168,8 @@ impl ArangoClient {
                 SORT alert.created_at DESC
                 RETURN alert
         "#;
-        self.query(aql, serde_json::json!({"severity": severity})).await
+        self.query(aql, serde_json::json!({"severity": severity}))
+            .await
     }
 
     /// Find unfixed alerts for repo
@@ -160,7 +181,8 @@ impl ArangoClient {
                 FILTER alert.dismissed_at == null
                 RETURN alert
         "#;
-        self.query(aql, serde_json::json!({"repo_key": repo_key})).await
+        self.query(aql, serde_json::json!({"repo_key": repo_key}))
+            .await
     }
 
     /// Find rules by effect
@@ -181,7 +203,7 @@ impl ArangoClient {
 
     /// Traverse from repo to all alerts
     pub async fn traverse_repo_alerts(&self, repo_key: &str) -> Result<TraversalResult<AlertDoc>> {
-        let aql = r#"
+        let _aql = r#"
             FOR v, e, p IN 1..1 OUTBOUND @start repo_has_alert
                 RETURN { vertex: v, edge: e, path: p }
         "#;
@@ -197,7 +219,7 @@ impl ArangoClient {
 
     /// Find which rules fixed which alerts
     pub async fn traverse_alert_fixes(&self, alert_key: &str) -> Result<TraversalResult<RuleDoc>> {
-        let aql = r#"
+        let _aql = r#"
             FOR v, e, p IN 1..1 OUTBOUND @start alert_fixed_by
                 RETURN { vertex: v, edge: e, path: p }
         "#;
@@ -212,8 +234,11 @@ impl ArangoClient {
     }
 
     /// Find all rules in a ruleset
-    pub async fn traverse_ruleset_rules(&self, ruleset_key: &str) -> Result<TraversalResult<RuleDoc>> {
-        let aql = r#"
+    pub async fn traverse_ruleset_rules(
+        &self,
+        ruleset_key: &str,
+    ) -> Result<TraversalResult<RuleDoc>> {
+        let _aql = r#"
             FOR v, e, p IN 1..1 OUTBOUND @start ruleset_contains
                 SORT e.order ASC
                 RETURN { vertex: v, edge: e, path: p }
@@ -311,11 +336,7 @@ impl ArangoClient {
     }
 
     /// Register a new repo with initial scan results
-    pub async fn register_repo(
-        &self,
-        repo: &RepoDoc,
-        alerts: &[AlertDoc],
-    ) -> Result<String> {
+    pub async fn register_repo(&self, repo: &RepoDoc, alerts: &[AlertDoc]) -> Result<String> {
         // Insert repo
         let repo_id = self.insert("repos", repo).await?;
 

@@ -5,7 +5,7 @@
 //! ensuring seamless data flow through the system.
 
 use cicd_hyper_a_adapters::forge::{Alert, AlertCategory, Forge, Repository, Severity, Visibility};
-use cicd_hyper_a_adapters::{ForgeService, SyncResult};
+use cicd_hyper_a_adapters::SyncResult;
 
 /// Test: Repository model conversion preserves data
 #[test]
@@ -70,12 +70,12 @@ fn test_alert_model_severity_seam() {
 fn test_alert_category_completeness() {
     // Verify all expected categories exist
     let categories = vec![
+        AlertCategory::WorkflowSecurity,
         AlertCategory::CodeSecurity,
+        AlertCategory::CodeQuality,
         AlertCategory::DependencyVuln,
-        AlertCategory::SecretLeak,
-        AlertCategory::Workflow,
-        AlertCategory::BranchProtection,
-        AlertCategory::Scorecard,
+        AlertCategory::ProcessHygiene,
+        AlertCategory::MissingTests,
     ];
 
     for category in categories {
@@ -142,7 +142,7 @@ fn test_visibility_variants() {
 #[cfg(feature = "integration")]
 mod integration {
     use super::*;
-    use data::{DataConfig, ArangoConfig, DragonflyConfig};
+    use data::{ArangoConfig, DataConfig, DragonflyConfig};
 
     #[tokio::test]
     async fn test_full_sync_pipeline() {

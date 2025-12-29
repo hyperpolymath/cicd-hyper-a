@@ -63,7 +63,7 @@ impl DragonflyClient {
         let json = serde_json::to_string(value)?;
         let ttl_secs = ttl.unwrap_or(self.config.default_ttl);
 
-        conn.set_ex(key, json, ttl_secs).await?;
+        conn.set_ex::<_, _, ()>(key, json, ttl_secs).await?;
         debug!("Set key {} with TTL {}s", key, ttl_secs);
         Ok(())
     }
@@ -82,7 +82,7 @@ impl DragonflyClient {
     /// Delete a key
     pub async fn delete(&self, key: &str) -> Result<()> {
         let mut conn = self.get_conn().await?;
-        conn.del(key).await?;
+        conn.del::<_, ()>(key).await?;
         Ok(())
     }
 
@@ -155,7 +155,8 @@ impl DragonflyClient {
     /// Add to alert priority queue
     pub async fn queue_alert(&self, alert_key: &str, severity_score: f64) -> Result<()> {
         let mut conn = self.get_conn().await?;
-        conn.zadd("queue:alerts", alert_key, severity_score).await?;
+        conn.zadd::<_, _, _, ()>("queue:alerts", alert_key, severity_score)
+            .await?;
         Ok(())
     }
 
@@ -169,14 +170,15 @@ impl DragonflyClient {
     /// Remove from alert queue
     pub async fn dequeue_alert(&self, alert_key: &str) -> Result<()> {
         let mut conn = self.get_conn().await?;
-        conn.zrem("queue:alerts", alert_key).await?;
+        conn.zrem::<_, _, ()>("queue:alerts", alert_key).await?;
         Ok(())
     }
 
     /// Add to fix queue (by timestamp)
     pub async fn queue_fix(&self, job_id: &str, timestamp: f64) -> Result<()> {
         let mut conn = self.get_conn().await?;
-        conn.zadd("queue:fixes", job_id, timestamp).await?;
+        conn.zadd::<_, _, _, ()>("queue:fixes", job_id, timestamp)
+            .await?;
         Ok(())
     }
 
@@ -190,7 +192,8 @@ impl DragonflyClient {
     /// Add to scan queue
     pub async fn queue_scan(&self, repo_key: &str, last_scanned: f64) -> Result<()> {
         let mut conn = self.get_conn().await?;
-        conn.zadd("queue:scans", repo_key, last_scanned).await?;
+        conn.zadd::<_, _, _, ()>("queue:scans", repo_key, last_scanned)
+            .await?;
         Ok(())
     }
 
@@ -209,7 +212,7 @@ impl DragonflyClient {
     pub async fn publish_alert(&self, alert: &AlertDoc) -> Result<()> {
         let mut conn = self.get_conn().await?;
         let json = serde_json::to_string(alert)?;
-        conn.publish("alerts:new", json).await?;
+        conn.publish::<_, _, ()>("alerts:new", json).await?;
         debug!("Published alert to alerts:new channel");
         Ok(())
     }
@@ -223,7 +226,7 @@ impl DragonflyClient {
             "timestamp": chrono::Utc::now().timestamp()
         })
         .to_string();
-        conn.publish("alerts:fixed", json).await?;
+        conn.publish::<_, _, ()>("alerts:fixed", json).await?;
         Ok(())
     }
 
@@ -236,7 +239,7 @@ impl DragonflyClient {
             "timestamp": chrono::Utc::now().timestamp()
         })
         .to_string();
-        conn.publish("rules:triggered", json).await?;
+        conn.publish::<_, _, ()>("rules:triggered", json).await?;
         Ok(())
     }
 
@@ -249,7 +252,7 @@ impl DragonflyClient {
             "timestamp": chrono::Utc::now().timestamp()
         })
         .to_string();
-        conn.publish("scans:complete", json).await?;
+        conn.publish::<_, _, ()>("scans:complete", json).await?;
         Ok(())
     }
 
@@ -273,7 +276,7 @@ impl DragonflyClient {
         // Increment and set expiry
         let new_count: i64 = conn.incr(&rate_key, 1).await?;
         if new_count == 1 {
-            conn.expire(&rate_key, window_secs as i64).await?;
+            conn.expire::<_, ()>(&rate_key, window_secs as i64).await?;
         }
 
         Ok(true)
@@ -290,10 +293,10 @@ impl DragonflyClient {
         let key = format!("job:{}", job.id);
 
         // Store job details
-        conn.set(&key, json).await?;
+        conn.set::<_, _, ()>(&key, json).await?;
 
         // Add to processing queue
-        conn.lpush("jobs:pending", &job.id).await?;
+        conn.lpush::<_, _, ()>("jobs:pending", &job.id).await?;
 
         Ok(())
     }
@@ -332,9 +335,26 @@ impl DragonflyClient {
         }
 
         let updated = serde_json::to_string(&job)?;
-        conn.set(&key, updated).await?;
+        conn.set::<_, _, ()>(&key, updated).await?;
 
         Ok(())
+    }
+
+    /// Publish generic event to a channel
+    pub async fn publish_event(&self, channel: &str, message: &str) -> Result<()> {
+        let mut conn = self.get_conn().await?;
+        conn.publish::<_, _, ()>(channel, message).await?;
+        Ok(())
+    }
+
+    /// Queue a job (alias for push_job compatibility with service layer)
+    pub async fn queue_job(&self, job: &QueuedJob) -> Result<()> {
+        self.push_job(job).await
+    }
+
+    /// Dequeue a job (alias for pop_job compatibility with service layer)
+    pub async fn dequeue_job(&self, _queue: &str) -> Result<Option<QueuedJob>> {
+        self.pop_job().await
     }
 }
 

@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! GitHub forge adapter
 
-use async_trait::async_trait;
-use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, AUTHORIZATION, USER_AGENT};
-use serde::{Deserialize, Serialize};
 use crate::error::{AdapterError, Result};
 use crate::forge::{
     Alert, AlertCategory, Forge, ForgeAdapter, Repository, Severity, Visibility, Workflow,
     WorkflowState,
 };
+use async_trait::async_trait;
+use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, AUTHORIZATION, USER_AGENT};
+use serde::Deserialize;
 
 /// GitHub adapter configuration
 pub struct GitHubAdapter {
@@ -35,10 +35,7 @@ impl GitHubAdapter {
             HeaderValue::from_str(&format!("Bearer {}", token))
                 .map_err(|_| AdapterError::ConfigError("Invalid token".into()))?,
         );
-        headers.insert(
-            USER_AGENT,
-            HeaderValue::from_static("cicd-hyper-a/0.1.0"),
-        );
+        headers.insert(USER_AGENT, HeaderValue::from_static("cicd-hyper-a/0.1.0"));
         headers.insert(
             "X-GitHub-Api-Version",
             HeaderValue::from_static("2022-11-28"),
@@ -93,12 +90,7 @@ impl ForgeAdapter for GitHubAdapter {
         let response: Vec<GitHubAlert> = match self.client.get(&url).send().await {
             Ok(resp) if resp.status().is_success() => resp.json().await?,
             Ok(resp) if resp.status().as_u16() == 404 => return Ok(vec![]),
-            Ok(resp) => {
-                return Err(AdapterError::ApiError(format!(
-                    "HTTP {}",
-                    resp.status()
-                )))
-            }
+            Ok(resp) => return Err(AdapterError::ApiError(format!("HTTP {}", resp.status()))),
             Err(e) => return Err(e.into()),
         };
 
@@ -181,12 +173,7 @@ impl ForgeAdapter for GitHubAdapter {
         Ok(())
     }
 
-    async fn enable_branch_protection(
-        &self,
-        owner: &str,
-        repo: &str,
-        branch: &str,
-    ) -> Result<()> {
+    async fn enable_branch_protection(&self, owner: &str, repo: &str, branch: &str) -> Result<()> {
         let url = format!(
             "{}/repos/{}/{}/branches/{}/protection",
             self.base_url, owner, repo, branch

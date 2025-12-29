@@ -4,13 +4,11 @@
 //! This module provides the seam between forge operations and persistence,
 //! ensuring all forge data flows seamlessly to ArangoDB and Dragonfly.
 
-use async_trait::async_trait;
-use data::{
-    ArangoClient, DataConfig, DataLayer, DragonflyClient,
-    AlertDoc, RepoDoc, RuleDoc, CachedRule, CachedRepoState, QueuedJob,
-};
 use crate::error::{AdapterError, Result};
-use crate::forge::{Alert, ForgeAdapter, Repository, Severity, Workflow};
+use crate::forge::{Alert, ForgeAdapter, Repository, Severity};
+use data::{
+    AlertDoc, CachedRepoState, CachedRule, DataConfig, DataLayer, QueuedJob, RepoDoc, RuleDoc,
+};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -69,11 +67,14 @@ impl ForgeService {
 
                 // Cache repo state in Dragonfly
                 let state = CachedRepoState {
+                    key: format!("repos/{}", repo.id),
                     repo_key: format!("repos/{}", repo.id),
                     health_score: 50, // Default score, will be calculated
                     alert_count: 0,
+                    rulesets_applied: vec![],
                     last_scan: chrono::Utc::now().timestamp(),
                     pending_fixes: 0,
+                    cached_at: chrono::Utc::now().timestamp(),
                 };
                 self.data
                     .dragonfly
@@ -98,14 +99,16 @@ impl ForgeService {
                             .dragonfly
                             .queue_alert(&alert_doc.key, score)
                             .await
-                            .map_err(|e| AdapterError::ApiError(format!("Dragonfly error: {}", e)))?;
+                            .map_err(|e| {
+                                AdapterError::ApiError(format!("Dragonfly error: {}", e))
+                            })?;
                     }
                     result.alerts_synced += 1;
                 }
 
                 // Fetch and sync workflows
                 let workflows = adapter.list_workflows(owner, repo_name).await?;
-                for workflow in &workflows {
+                for _workflow in &workflows {
                     result.workflows_synced += 1;
                 }
 
@@ -118,12 +121,7 @@ impl ForgeService {
     }
 
     /// Apply rule to alert and persist the fix
-    pub async fn apply_fix(
-        &self,
-        alert_key: &str,
-        rule_key: &str,
-        confidence: f64,
-    ) -> Result<()> {
+    pub async fn apply_fix(&self, alert_key: &str, rule_key: &str, confidence: f64) -> Result<()> {
         // Record fix application in ArangoDB
         self.data
             .arango
@@ -148,7 +146,7 @@ impl ForgeService {
     }
 
     /// Get matching rules for an alert using cached rules
-    pub async fn get_matching_rules(&self, alert: &Alert) -> Result<Vec<CachedRule>> {
+    pub async fn get_matching_rules(&self, _alert: &Alert) -> Result<Vec<CachedRule>> {
         let cache = self.rule_cache.read().await;
 
         // Filter rules that match alert category
@@ -170,9 +168,7 @@ impl ForgeService {
         let rules: Vec<RuleDoc> = self
             .data
             .arango
-            .query_documents(
-                "FOR r IN rules FILTER r.enabled == true RETURN r",
-            )
+            .query_documents("FOR r IN rules FILTER r.enabled == true RETURN r")
             .await
             .map_err(|e| AdapterError::ApiError(format!("ArangoDB error: {}", e)))?;
 
@@ -184,9 +180,15 @@ impl ForgeService {
             let cached = CachedRule {
                 key: rule.key.clone(),
                 name: rule.name.clone(),
+                ruleset: String::new(),
+                rule_id: rule.key.clone(),
                 effect: rule.effect.clone(),
                 trigger_pattern: rule.trigger_pattern.clone().unwrap_or_default(),
                 confidence: rule.confidence,
+                condition_bytecode: vec![],
+                action_bytecode: vec![],
+                cached_at: chrono::Utc::now().timestamp(),
+                ttl: 3600,
             };
 
             // Cache in Dragonfly
@@ -256,15 +258,19 @@ impl ForgeService {
             name: repo.name.clone(),
             url: repo.url.clone(),
             default_branch: repo.default_branch.clone(),
+            visibility: String::new(),
             health_score: 50, // Default, will be calculated
             languages: repo.languages.clone(),
             last_scan: chrono::Utc::now().to_rfc3339(),
+            scorecard_score: None,
+            alert_count: 0,
         }
     }
 
     fn alert_to_doc(&self, alert: &Alert, repo_id: &str) -> AlertDoc {
         AlertDoc {
             key: format!("{}-{}", repo_id, alert.id),
+            alert_id: alert.id.clone(),
             repo_key: format!("repos/{}", repo_id),
             rule_id: alert.rule_id.clone(),
             severity: format!("{:?}", alert.severity).to_lowercase(),
@@ -275,6 +281,7 @@ impl ForgeService {
             fix_applied: false,
             auto_fixable: alert.auto_fixable,
             created_at: chrono::Utc::now().to_rfc3339(),
+            dismissed_at: None,
         }
     }
 

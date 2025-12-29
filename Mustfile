@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Mandatory checks for cicd-hyper-a before merge/deploy
+
+version: 1
+
+checks:
+  - name: lint
+    run: just lint
+
+  - name: format
+    run: just check-fmt
+
+  - name: test
+    run: just test
+
+  - name: security
+    run: just security

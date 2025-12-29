@@ -12,11 +12,18 @@ pub struct RepoDoc {
     pub forge: String,
     pub owner: String,
     pub url: String,
+    #[serde(default)]
+    pub default_branch: String,
+    #[serde(default)]
     pub visibility: String,
+    #[serde(default)]
     pub languages: Vec<String>,
-    pub last_scanned: Option<String>,
+    #[serde(default)]
+    pub last_scan: String,
     pub scorecard_score: Option<f64>,
+    #[serde(default)]
     pub health_score: i32,
+    #[serde(default)]
     pub alert_count: i32,
 }
 
@@ -46,13 +53,24 @@ pub struct RuleDoc {
     pub key: String,
     pub name: String,
     pub effect: String,
+    #[serde(default)]
     pub source: String,
+    #[serde(default)]
     pub version: String,
+    #[serde(default)]
     pub enabled: bool,
+    #[serde(default)]
     pub trigger_count: i64,
+    #[serde(default)]
     pub success_rate: f64,
+    #[serde(default)]
+    pub confidence: f64,
+    #[serde(default)]
+    pub trigger_pattern: Option<String>,
     pub last_triggered: Option<String>,
+    #[serde(default)]
     pub condition_json: String,
+    #[serde(default)]
     pub action_json: String,
 }
 
@@ -121,23 +139,41 @@ pub struct RulesetContains {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CachedRule {
     pub key: String,
+    pub name: String,
+    #[serde(default)]
     pub ruleset: String,
+    #[serde(default)]
     pub rule_id: String,
     pub effect: String,
+    #[serde(default)]
+    pub trigger_pattern: String,
+    #[serde(default)]
+    pub confidence: f64,
+    #[serde(default)]
     pub condition_bytecode: Vec<u8>,
+    #[serde(default)]
     pub action_bytecode: Vec<u8>,
+    #[serde(default)]
     pub cached_at: i64,
+    #[serde(default)]
     pub ttl: i64,
 }
 
 /// Cache entry for repo state
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CachedRepoState {
+    #[serde(default)]
     pub key: String,
+    pub repo_key: String,
     pub health_score: i32,
+    #[serde(default)]
     pub alert_count: i32,
+    #[serde(default)]
     pub rulesets_applied: Vec<String>,
     pub last_scan: i64,
+    #[serde(default)]
+    pub pending_fixes: i32,
+    #[serde(default)]
     pub cached_at: i64,
 }
 
@@ -145,14 +181,14 @@ pub struct CachedRepoState {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QueuedJob {
     pub id: String,
-    pub job_type: String,  // "scan", "fix", "deploy"
+    pub job_type: String, // "scan", "fix", "deploy"
     pub repo_key: String,
     pub rule_id: Option<String>,
     pub priority: i32,
     pub created_at: i64,
     pub started_at: Option<i64>,
     pub completed_at: Option<i64>,
-    pub status: String,    // "pending", "running", "completed", "failed"
+    pub status: String, // "pending", "running", "completed", "failed"
     pub result: Option<String>,
 }
 

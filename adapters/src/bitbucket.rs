@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Bitbucket forge adapter
 
+use crate::error::{AdapterError, Result};
+use crate::forge::{Alert, Forge, ForgeAdapter, Repository, Visibility, Workflow, WorkflowState};
 use async_trait::async_trait;
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
 use serde::Deserialize;
-use crate::error::{AdapterError, Result};
-use crate::forge::{
-    Alert, Forge, ForgeAdapter, Repository, Visibility, Workflow, WorkflowState,
-};
 
 /// Bitbucket adapter configuration
 pub struct BitbucketAdapter {
@@ -71,7 +69,10 @@ impl ForgeAdapter for BitbucketAdapter {
                 } else {
                     Visibility::Public
                 },
-                default_branch: r.mainbranch.map(|b| b.name).unwrap_or_else(|| "main".to_string()),
+                default_branch: r
+                    .mainbranch
+                    .map(|b| b.name)
+                    .unwrap_or_else(|| "main".to_string()),
                 languages: r.language.map(|l| vec![l]).unwrap_or_default(),
             })
             .collect())
@@ -109,10 +110,7 @@ impl ForgeAdapter for BitbucketAdapter {
         content: &str,
         message: &str,
     ) -> Result<()> {
-        let url = format!(
-            "{}/repositories/{}/{}/src",
-            self.base_url, owner, repo
-        );
+        let url = format!("{}/repositories/{}/{}/src", self.base_url, owner, repo);
 
         // Bitbucket uses form data for file uploads
         let form = reqwest::multipart::Form::new()
@@ -131,12 +129,7 @@ impl ForgeAdapter for BitbucketAdapter {
         Ok(())
     }
 
-    async fn enable_branch_protection(
-        &self,
-        owner: &str,
-        repo: &str,
-        branch: &str,
-    ) -> Result<()> {
+    async fn enable_branch_protection(&self, owner: &str, repo: &str, branch: &str) -> Result<()> {
         let url = format!(
             "{}/repositories/{}/{}/branch-restrictions",
             self.base_url, owner, repo

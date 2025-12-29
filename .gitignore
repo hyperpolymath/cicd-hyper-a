@@ -1,0 +1,40 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Build artifacts
+target/
+dist-newstyle/
+*.hi
+*.o
+*.a
+
+# Rust - Keep workspace Cargo.lock for reproducible builds
+
+# Haskell
+.stack-work/
+.cabal-sandbox/
+cabal.sandbox.config
+*.dyn_hi
+*.dyn_o
+
+# IDE/Editor
+.idea/
+.vscode/
+*.swp
+*~
+*.bak
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.envrc
+.env.local
+*.pem
+*.key
+
+# Logs
+*.log
+logs/
+
+# Local development
+.local/
+tmp/

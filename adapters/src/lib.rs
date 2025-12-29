@@ -4,13 +4,13 @@
 //! Provides forge adapters (GitHub, GitLab, Bitbucket) integrated with
 //! the data layer (ArangoDB, Dragonfly) via the service module.
 
+pub mod bitbucket;
+pub mod error;
 pub mod forge;
 pub mod github;
 pub mod gitlab;
-pub mod bitbucket;
-pub mod error;
 pub mod service;
 
-pub use forge::{Forge, ForgeAdapter, Repository, Alert, Workflow};
 pub use error::AdapterError;
-pub use service::{ForgeService, SyncResult, ServiceHealth};
+pub use forge::{Alert, Forge, ForgeAdapter, Repository, Workflow};
+pub use service::{ForgeService, ServiceHealth, SyncResult};

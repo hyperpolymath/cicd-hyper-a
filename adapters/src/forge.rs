@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Common forge traits and types
 
+use crate::error::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use crate::error::Result;
 
 /// Supported forge types
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

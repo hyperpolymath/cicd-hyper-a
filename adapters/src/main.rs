@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! cicd-hyper-a forge adapter CLI
 
-use std::env;
-use cicd_hyper_a_adapters::{Forge, ForgeAdapter};
 use cicd_hyper_a_adapters::github::GitHubAdapter;
+use cicd_hyper_a_adapters::ForgeAdapter;
+use std::env;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -23,7 +23,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let adapter = get_github_adapter()?;
             let repos = adapter.list_repos(&args[2]).await?;
             for repo in repos {
-                println!("{}/{} ({})", repo.owner, repo.name, repo.visibility);
+                println!("{}/{} ({:?})", repo.owner, repo.name, repo.visibility);
             }
         }
         "get-alerts" => {
@@ -36,7 +36,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             for alert in alerts {
                 println!(
                     "[{:?}] {}: {} ({})",
-                    alert.severity, alert.rule_id, alert.description,
+                    alert.severity,
+                    alert.rule_id,
+                    alert.description,
                     alert.file.unwrap_or_default()
                 );
             }
@@ -58,7 +60,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 return Ok(());
             }
             let adapter = get_github_adapter()?;
-            adapter.trigger_workflow(&args[2], &args[3], &args[4], "main").await?;
+            adapter
+                .trigger_workflow(&args[2], &args[3], &args[4], "main")
+                .await?;
             println!("Triggered workflow: {}", args[4]);
         }
         "help" | "--help" | "-h" => {
