@@ -447,12 +447,18 @@ cicd-hyper-a/
 * [ ] Public registry launch
 * [ ] Enterprise features
 
+== Documentation
+
+* link:CII-ENFORCEMENT.adoc[CII Best Practices Badge Enforcement] - Centralized vs local enforcement architecture
+* link:PALIMPSEST.adoc[Palimpsest Philosophy] - Philosophical underpinnings
+
 == Related Projects
 
 * link:https://github.com/hyperpolymath/robot-repo-automaton[robot-repo-automaton] - Automated repository management
 * link:https://github.com/hyperpolymath/gitvisor[gitvisor] - CI/CD intelligence system
 * link:https://github.com/hyperpolymath/rhodium-standard-repositories[rhodium-standard-repositories] - Repository standards
 * link:https://github.com/hyperpolymath/palimpsest-license[palimpsest-license] - Philosophical licence
+* link:https://www.bestpractices.dev[OpenSSF Best Practices Badge] - Security certification program
 
 == License
 
