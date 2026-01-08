@@ -18,7 +18,11 @@
         classify_severity/2,
         is_auto_fixable/1,
         suggest_fix/2,
-        get_prevention_workflow/2
+        get_prevention_workflow/2,
+        %% Learning integration
+        suggest_fix_with_learning/2,
+        record_fix_outcome/3,
+        get_best_fix/2
     ]).
 
     %% ============================================================
@@ -217,5 +221,41 @@
 
     file_in_saltstack(File) :-
         atom_concat('salt/', _, File).
+
+    %% ============================================================
+    %% LEARNING INTEGRATION
+    %% ============================================================
+
+    %% Suggest fix using learned knowledge first, then static rules
+    suggest_fix_with_learning(IssueType, Fix) :-
+        ( learning::recommend_fix(IssueType, LearnedFix),
+          learning::get_confidence(IssueType, Conf),
+          Conf >= 0.7 ->
+            Fix = LearnedFix
+        ; suggest_fix(IssueType, Fix)
+        ).
+
+    %% Record the outcome of applying a fix (feeds back into learning)
+    %% Outcome: success | failure | partial
+    record_fix_outcome(IssueType, Fix, Outcome) :-
+        learning::learn_from_fix(IssueType, Fix, Outcome).
+
+    %% Get best fix combining static rules and learned knowledge
+    %% Returns: fix(Fix, Source, Confidence) where Source is static | learned
+    get_best_fix(IssueType, fix(Fix, Source, Confidence)) :-
+        ( learning::get_confidence(IssueType, LearnedConf),
+          LearnedConf >= 0.75,
+          learning::recommend_fix(IssueType, LearnedFix) ->
+            Fix = LearnedFix,
+            Source = learned,
+            Confidence = LearnedConf
+        ; suggest_fix(IssueType, StaticFix) ->
+            Fix = StaticFix,
+            Source = static,
+            Confidence = 1.0
+        ; Fix = 'No fix available',
+          Source = none,
+          Confidence = 0.0
+        ).
 
 :- end_object.
