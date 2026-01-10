@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: PMPL-1.0
 # cicd-hyper-a Integration with robot-repo-automaton
 # Configuration for automated repository management
 
@@ -85,6 +85,8 @@ rules:
       - block-typescript
       - block-golang
       - require-spdx-header
+      - require-pmpl-license
+      - require-pmpl-badge
       - check-secrets
 
   # Curative rules - run on schedule/webhook

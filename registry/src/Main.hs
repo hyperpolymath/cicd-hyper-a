@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
--- SPDX-License-Identifier: AGPL-3.0-or-later
+-- SPDX-License-Identifier: PMPL-1.0
 -- | cicd-hyper-a Rule Registry CLI
 --
 -- Provides commands for:
@@ -275,7 +275,7 @@ cmdAudit args = case args of
     TIO.putStrLn "Provenance:"
     TIO.putStrLn $ "  Author: hyperpolymath"
     TIO.putStrLn $ "  Source: github.com/hyperpolymath/" <> T.pack name
-    TIO.putStrLn $ "  License: AGPL-3.0-or-later"
+    TIO.putStrLn $ "  License: PMPL-1.0-or-later"
 
     exitSuccess
 
@@ -354,7 +354,7 @@ cmdHooksInstall path = do
   let preCommit = hooksDir </> "pre-commit"
   TIO.writeFile preCommit $ T.unlines
     [ "#!/bin/bash"
-    , "# SPDX-License-Identifier: AGPL-3.0-or-later"
+    , "# SPDX-License-Identifier: PMPL-1.0
     , "# Installed by cicd-hyper-a"
     , ""
     , "cicd-hyper-a hooks pre-commit \\"
@@ -367,7 +367,7 @@ cmdHooksInstall path = do
   let prePush = hooksDir </> "pre-push"
   TIO.writeFile prePush $ T.unlines
     [ "#!/bin/bash"
-    , "# SPDX-License-Identifier: AGPL-3.0-or-later"
+    , "# SPDX-License-Identifier: PMPL-1.0
     , "# Installed by cicd-hyper-a"
     , ""
     , "cicd-hyper-a hooks pre-push \\"
@@ -476,6 +476,8 @@ cmdHelp = TIO.putStrLn $ T.unlines
   , "  pin-github-actions             Pin actions to SHA"
   , "  require-workflow-permissions   Add permissions: read-all"
   , "  require-spdx-header            Add SPDX license headers"
+  , "  require-pmpl-license           Require PMPL license file"
+  , "  require-pmpl-badge             Require PMPL badge in README"
   ]
 
 -- ============================================================

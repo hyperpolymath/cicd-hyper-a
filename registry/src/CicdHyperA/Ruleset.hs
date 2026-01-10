@@ -2,7 +2,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE StandaloneDeriving #-}
--- SPDX-License-Identifier: AGPL-3.0-or-later
+-- SPDX-License-Identifier: PMPL-1.0
 -- | Type-safe ruleset DSL for cicd-hyper-a
 
 module CicdHyperA.Ruleset
@@ -27,6 +27,8 @@ module CicdHyperA.Ruleset
   , pinGitHubActions
   , requireWorkflowPermissions
   , requireSpdxHeader
+  , requirePmplLicense
+  , requirePmplBadge
   ) where
 
 import Data.Text (Text)
@@ -163,13 +165,33 @@ requireSpdxHeader = PreventiveRule
   (Not (FileContains "*" "SPDX-License-Identifier"))
   (Alert Medium "File missing SPDX license header")
 
+-- | Require PMPL license text in LICENSE or LICENSE.txt
+requirePmplLicense :: Rule 'Preventive
+requirePmplLicense = PreventiveRule
+  "require-pmpl-license"
+  (Not (Or
+    (FileContains "LICENSE" "PMPL-1.0")
+    (FileContains "LICENSE.txt" "PMPL-1.0")))
+  (RejectCommit "Missing PMPL license file content (PMPL-1.0)")
+
+-- | Require PMPL badge in README.*
+requirePmplBadge :: Rule 'Preventive
+requirePmplBadge = PreventiveRule
+  "require-pmpl-badge"
+  (Not (Or
+    (FileContains "README.adoc" "img.shields.io/badge/license-PMPL--1.0")
+    (FileContains "README.md" "img.shields.io/badge/license-PMPL--1.0")
+    (FileContains "README.rst" "img.shields.io/badge/license-PMPL--1.0")
+    (FileContains "README.txt" "img.shields.io/badge/license-PMPL--1.0")))
+  (RejectCommit "Missing PMPL license badge in README")
+
 -- ============================================================
 -- Templates
 -- ============================================================
 
 dependabotTemplate :: Text
 dependabotTemplate = T.unlines
-  [ "# SPDX-License-Identifier: AGPL-3.0-or-later"
+  [ "# SPDX-License-Identifier: PMPL-1.0
   , "version: 2"
   , "updates:"
   , "  - package-ecosystem: \"github-actions\""
